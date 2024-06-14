@@ -8,17 +8,76 @@
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.control.TextField?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+<?import javafx.scene.control.Slider?>
+<?import javafx.scene.layout.Region?>
 <VBox alignment="CENTER" spacing="20.0" xmlns:fx="http://javafx.com/fxml"
       fx:controller="com.calebli.phpump.HelloController">
   <padding>
     <Insets bottom="20.0" left="20.0" right="20.0" top="20.0"/>
   </padding>
 
-  <TableView fx:id="tableView"/>
-  <AnchorPane fx:id="chartView"/>
-  <Label fx:id="digitalMeter"/>
-  <ComboBox fx:id="portComboBox"/>
-  <ComboBox fx:id="baudRateComboBox"/>
-  <Button text="Reload COM ports" onAction="#reloadPorts"/>
-  <Button text="Open Port"/>
+  <HBox>
+    <Button fx:id="saveButton" onAction="#save">
+      <graphic>
+        <FontIcon iconLiteral="mdi2c-content-save"/>
+      </graphic>
+    </Button>
+    <Button fx:id="openButton" onAction="#open">
+      <graphic>
+        <FontIcon iconLiteral="mdi2f-folder-open" />
+      </graphic>
+    </Button>
+    <Button fx:id="runButton" onAction="#runButton">
+      <graphic>
+        <FontIcon iconLiteral="mdi2p-play"/>
+      </graphic>
+    </Button>
+    <Button fx:id="clearDataButton" onAction="#clearData">
+      <graphic>
+        <FontIcon iconLiteral="mdi2d-delete"/>
+      </graphic>
+    </Button>
+    <Label fx:id="runTimeLabel"/>
+    <Region HBox.hgrow="ALWAYS"/>
+    <HBox>
+      <Label fx:id="acidSlope" text="0.00%"/>
+      <Label fx:id="baseSlope" text="0.00%"/>
+      <Label fx:id="zeroOffset" text="0.00 mV"/>
+    </HBox>
+    <HBox>
+      <ComboBox fx:id="calibrateComboBox"/>
+      <TextField fx:id="calibratePh" promptText="pH of solution"/>
+      <Button text="Calibrate" onAction="#calibrate"/>
+    </HBox>
+  </HBox>
+  <HBox>
+    <VBox>
+      <TableView fx:id="tableView"/>
+      <HBox>
+        <TextField fx:id="enterTime" promptText="Time"/>
+        <TextField fx:id="enterPh" promptText="pH"/>
+        <Button onAction="#addEntry">
+          <graphic>
+            <FontIcon iconLiteral="mdi2p-plus"/>
+          </graphic>
+        </Button>
+      </HBox>
+      <Label fx:id="digitalMeter" text="0.00" textAlignment="CENTER" alignment="CENTER"/>
+    </VBox>
+    <AnchorPane fx:id="chartView"/>
+    <Slider orientation="VERTICAL"/>
+  </HBox>
+  <HBox>
+    <TextField fx:id="cmdField" promptText="Command"/>
+    <Button text="Enter" onAction="#submitCommand"/>
+    <Region HBox.hgrow="ALWAYS"/>
+    <ComboBox fx:id="portComboBox"/>
+    <ComboBox fx:id="baudRateComboBox"/>
+    <Button text="Reload COM ports" onAction="#reloadPorts"/>
+    <Button fx:id="openPortButton" text="Open Port" onAction="#openPort"/>
+  </HBox>
+
 </VBox>
