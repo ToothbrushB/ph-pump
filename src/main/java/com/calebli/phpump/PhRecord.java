@@ -3,7 +3,6 @@ package com.calebli.phpump;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 
-import java.util.Objects;
 
 public final class PhRecord {
     private final DoubleProperty time = new SimpleDoubleProperty();

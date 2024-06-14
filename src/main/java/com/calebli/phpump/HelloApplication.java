@@ -1,6 +1,5 @@
 package com.calebli.phpump;
 
-import com.fazecast.jSerialComm.SerialPort;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
