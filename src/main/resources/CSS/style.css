@@ -1,0 +1,29 @@
+.good-popup {
+    -fx-background-color: palegreen;
+    -fx-padding: 10;
+    -fx-border-color: black;
+    -fx-border-width: 1;
+    -fx-font-size: 16;
+}
+
+.warn-popup {
+    -fx-background-color: lemonchiffon;
+    -fx-padding: 10;
+    -fx-border-color: black;
+    -fx-border-width: 1;
+    -fx-font-size: 16;
+}
+
+
+.error-popup {
+    -fx-background-color: lightpink;
+    -fx-padding: 10;
+    -fx-border-color: black;
+    -fx-border-width: 1;
+    -fx-font-size: 16;
+}
+
+.digital-meter {
+    -fx-font-size: 48;
+    -fx-alignment: center;
+}

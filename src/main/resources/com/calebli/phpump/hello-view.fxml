@@ -1,83 +1,177 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
-<?import javafx.scene.control.Label?>
-<?import javafx.scene.layout.VBox?>
-
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.ComboBox?>
-<?import javafx.scene.control.TableView?>
-<?import javafx.scene.layout.AnchorPane?>
-<?import javafx.scene.layout.HBox?>
-<?import javafx.scene.control.TextField?>
-<?import org.kordamp.ikonli.javafx.FontIcon?>
-<?import javafx.scene.control.Slider?>
-<?import javafx.scene.layout.Region?>
+<?import com.calebli.phpump.*?>
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import org.kordamp.ikonli.javafx.*?>
 <VBox alignment="CENTER" spacing="20.0" xmlns:fx="http://javafx.com/fxml"
       fx:controller="com.calebli.phpump.HelloController">
-  <padding>
-    <Insets bottom="20.0" left="20.0" right="20.0" top="20.0"/>
-  </padding>
-
-  <HBox>
-    <Button fx:id="saveButton" onAction="#save">
-      <graphic>
-        <FontIcon iconLiteral="mdi2c-content-save"/>
-      </graphic>
-    </Button>
-    <Button fx:id="openButton" onAction="#open">
-      <graphic>
-        <FontIcon iconLiteral="mdi2f-folder-open" />
-      </graphic>
-    </Button>
-    <Button fx:id="runButton" onAction="#runButton">
-      <graphic>
-        <FontIcon iconLiteral="mdi2p-play"/>
-      </graphic>
-    </Button>
-    <Button fx:id="clearDataButton" onAction="#clearData">
-      <graphic>
-        <FontIcon iconLiteral="mdi2d-delete"/>
-      </graphic>
-    </Button>
-    <Label fx:id="runTimeLabel"/>
-    <Region HBox.hgrow="ALWAYS"/>
+    <padding>
+        <Insets bottom="20.0" left="20.0" right="20.0" top="20.0"/>
+    </padding>
+    <MenuBar fx:id="menuBar">
+        <Menu text="File">
+            <MenuItem text="Open" onAction="#open" fx:id="openMenu"/>
+            <MenuItem text="Save" onAction="#save" fx:id="saveMenu"/>
+            <MenuItem text="Save As" onAction="#saveAs" fx:id="saveAsMenu"/>
+        </Menu>
+        <Menu text="Edit">
+            <MenuItem text="Copy" onAction="#copy" fx:id="copyMenu"/>
+        </Menu>
+    </MenuBar>
     <HBox>
-      <Label fx:id="acidSlope" text="0.00%"/>
-      <Label fx:id="baseSlope" text="0.00%"/>
-      <Label fx:id="zeroOffset" text="0.00 mV"/>
-    </HBox>
-    <HBox>
-      <ComboBox fx:id="calibrateComboBox"/>
-      <TextField fx:id="calibratePh" promptText="pH of solution"/>
-      <Button text="Calibrate" onAction="#calibrate"/>
-    </HBox>
-  </HBox>
-  <HBox>
-    <VBox>
-      <TableView fx:id="tableView"/>
-      <HBox>
-        <TextField fx:id="enterTime" promptText="Time"/>
-        <TextField fx:id="enterPh" promptText="pH"/>
-        <Button onAction="#addEntry">
-          <graphic>
-            <FontIcon iconLiteral="mdi2p-plus"/>
-          </graphic>
+        <Button fx:id="saveButton" onAction="#save">
+            <graphic>
+                <FontIcon iconLiteral="mdi2c-content-save"/>
+            </graphic>
         </Button>
-      </HBox>
-      <Label fx:id="digitalMeter" text="0.00" textAlignment="CENTER" alignment="CENTER"/>
-    </VBox>
-    <AnchorPane fx:id="chartView"/>
-    <Slider orientation="VERTICAL"/>
-  </HBox>
-  <HBox>
-    <TextField fx:id="cmdField" promptText="Command"/>
-    <Button text="Enter" onAction="#submitCommand"/>
-    <Region HBox.hgrow="ALWAYS"/>
-    <ComboBox fx:id="portComboBox"/>
-    <ComboBox fx:id="baudRateComboBox"/>
-    <Button text="Reload COM ports" onAction="#reloadPorts"/>
-    <Button fx:id="openPortButton" text="Open Port" onAction="#openPort"/>
-  </HBox>
+        <Button fx:id="openButton" onAction="#open">
+            <graphic>
+                <FontIcon iconLiteral="mdi2f-folder-open"/>
+            </graphic>
+        </Button>
+        <Button fx:id="runButton" onAction="#runButton">
+            <graphic>
+                <FontIcon iconLiteral="mdi2p-play"/>
+            </graphic>
+        </Button>
+        <Button fx:id="clearDataButton" onAction="#clearData">
+            <graphic>
+                <FontIcon iconLiteral="mdi2d-delete"/>
+            </graphic>
+        </Button>
+        <Label fx:id="runTimeLabel"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <HBox>
+
+            <Label text="Slope: ">
+                <HBox.margin>
+                    <Insets left="5" right="5"/>
+                </HBox.margin>
+            </Label>
+            <Label fx:id="acidSlope" text="0.00%">
+                <HBox.margin>
+                    <Insets left="5" right="5"/>
+                </HBox.margin>
+            </Label>
+            <Label fx:id="baseSlope" text="0.00%">
+                <HBox.margin>
+                    <Insets left="5" right="5"/>
+                </HBox.margin>
+            </Label>
+            <Label fx:id="zeroOffset" text="0.00 mV">
+                <HBox.margin>
+                    <Insets left="5" right="5"/>
+                </HBox.margin>
+            </Label>
+        </HBox>
+        <HBox>
+            <ComboBox fx:id="calibrateComboBox"/>
+            <DoubleTextField fx:id="calibratePh" promptText="pH of solution"/>
+            <Button text="Calibrate" onAction="#calibrate"/>
+        </HBox>
+    </HBox>
+    <HBox>
+        <VBox alignment="CENTER">
+            <padding>
+                <Insets topRightBottomLeft="10"/>
+            </padding>
+            <TableView fx:id="tableView"/>
+            <HBox>
+                <DoubleTextField fx:id="enterTime" promptText="Time"/>
+                <DoubleTextField fx:id="enterPh" promptText="pH"/>
+                <Button onAction="#addEntry">
+                    <graphic>
+                        <FontIcon iconLiteral="mdi2p-plus"/>
+                    </graphic>
+                </Button>
+            </HBox>
+            <Label fx:id="digitalMeter" text="0.00" textAlignment="CENTER" alignment="CENTER"
+                   styleClass="digital-meter"/>
+        </VBox>
+        <BorderPane fx:id="chartView">
+            <left>
+                <VBox>
+                    <DoubleTextField fx:id="yAxisMax" maxWidth="50" value="100"/>
+                    <Region VBox.vgrow="ALWAYS"/>
+                    <DoubleTextField fx:id="yAxisMin" maxWidth="50" value="0"/>
+                </VBox>
+            </left>
+            <bottom>
+                <HBox>
+                    <DoubleTextField fx:id="xAxisMin" maxWidth="50" value="0"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <DoubleTextField fx:id="xAxisMax" maxWidth="50" value="200"/>
+                </HBox>
+            </bottom>
+        </BorderPane>
+        <VBox>
+            <padding>
+                <Insets topRightBottomLeft="5"/>
+            </padding>
+            <IntegerTextField fx:id="sliderMax" maxWidth="50" value="200" promptText="Slider max"/>
+            <Slider orientation="VERTICAL" fx:id="waterLevelSlider" max="200" min="0" disable="true"/>
+            <IntegerTextField fx:id="sliderMin" maxWidth="50" value="0" promptText="Slider min"/>
+        </VBox>
+        <VBox>
+            <padding>
+                <Insets topRightBottomLeft="5"/>
+            </padding>
+            <Button fx:id="overridePumpButton" text="Pump On (hold button)" onMousePressed="#pumpOn"
+                    onMouseReleased="#pumpAuto"/>
+            <fx:define>
+                <ToggleGroup fx:id="pumpModeGroup"/>
+            </fx:define>
+            <VBox>
+                <padding>
+                    <Insets topRightBottomLeft="5"/>
+                </padding>
+                <RadioButton fx:id="pumpOnRb" toggleGroup="$pumpModeGroup" text="On"/>
+                <RadioButton fx:id="pumpAutoRb" toggleGroup="$pumpModeGroup" text="Auto" selected="true"/>
+                <RadioButton fx:id="pumpOffRb" toggleGroup="$pumpModeGroup" text="Off"/>
+            </VBox>
+            <GridPane hgap="20">
+                <Label text="High" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+                <IntegerTextField fx:id="pumpHigh" maxWidth="50" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+                <Label text="Low" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+                <IntegerTextField fx:id="pumpLow" maxWidth="50" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+                <Label text="Timeout" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+                <IntegerTextField fx:id="pumpTimeout" maxWidth="50" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+                <Button fx:id="savePumpButton" visible="false" onAction="#savePumpSettings" text="Burn to flash"
+                        GridPane.columnIndex="0" GridPane.rowIndex="3"/>
+            </GridPane>
+        </VBox>
+
+
+    </HBox>
+    <HBox>
+        <VBox>
+            <HBox>
+                <TextField fx:id="cmdField" promptText="Command"/>
+                <Button text="Enter" onAction="#submitCommand"/>
+            </HBox>
+            <HBox>
+                <TextArea fx:id="consoleText" disable="true" prefHeight="100"/>
+                <VBox>
+                    <!--          <HBox>-->
+                    <!--            <CheckBox fx:id="autoScrollCheckBox"/>-->
+                    <!--            <Label text="Auto-scroll"/>-->
+                    <!--          </HBox>-->
+                    <Button fx:id="clearConsoleButton" onAction="#clearConsole">
+                        <graphic>
+                            <FontIcon iconLiteral="mdi2d-delete"/>
+                        </graphic>
+                    </Button>
+                </VBox>
+            </HBox>
+        </VBox>
+
+        <Region HBox.hgrow="ALWAYS"/>
+        <ComboBox fx:id="portComboBox"/>
+        <ComboBox fx:id="baudRateComboBox"/>
+        <Button text="Reload COM ports" onAction="#reloadPorts"/>
+        <Button fx:id="openPortButton" text="Open Port" onAction="#openPort"/>
+    </HBox>
 
 </VBox>
