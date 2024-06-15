@@ -230,13 +230,8 @@ public class HelloController {
         loadDataChart();
         data.addListener((ListChangeListener<? super PhRecord>) c -> {
             while (c.next()) {
-                if (c.wasPermutated()) {
-                    // ignore because order doesn't matter in a chart
-//                        for (int i = c.getFrom(); i < c.getTo(); ++i) {
-//                            //permutate
-//                            c.getPermutation(i);
-//                        }
-                } else if (c.wasUpdated()) {
+                // don't care about permute bc order doesn't matter in a chart
+                if (c.wasUpdated()) {
                     //update item
                     // since we have no idea which element changed bc we don't keep track of indices, we have no choice but to rebuild the entire list
                     loadDataChart();

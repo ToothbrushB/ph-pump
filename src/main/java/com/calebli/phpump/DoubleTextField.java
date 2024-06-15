@@ -38,7 +38,7 @@ public class DoubleTextField extends TextField {
         }
     };
 
-    private TextFormatter<Double> textFormatter = new TextFormatter<>(converter, 0.0, filter);
+    private final TextFormatter<Double> textFormatter = new TextFormatter<>(converter, 0.0, filter);
 
     public DoubleTextField() {
         this(0.0);

@@ -38,7 +38,7 @@ public class IntegerTextField extends TextField {
         }
     };
 
-    private TextFormatter<Integer> textFormatter = new TextFormatter<>(converter, 0, filter);
+    private final TextFormatter<Integer> textFormatter = new TextFormatter<>(converter, 0, filter);
 
     public IntegerTextField() {
         this(0);
