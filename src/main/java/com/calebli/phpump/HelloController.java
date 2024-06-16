@@ -8,6 +8,7 @@ import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyObjectWrapper;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
@@ -43,6 +44,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.LinkedList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.fazecast.jSerialComm.SerialPort.*;
@@ -53,6 +55,20 @@ public class HelloController {
     private final DateTimeFormatter timeFormat = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
     private final NumberFormat pHMeterFormat = new DecimalFormat("#0.000");
     private final ObservableList<PhRecord> data = FXCollections.observableList(new LinkedList<>());
+    @FXML
+    private ComboBox<TimeUnits> timeUnitComboBox;
+    @FXML
+    private Label statusReadout;
+    @FXML
+    private CheckBox showPointsCheck;
+    //    @FXML
+//    private CheckBox zeroRangeCheckY;
+    @FXML
+    private CheckBox autoRangeCheckY;
+    @FXML
+    private CheckBox autoRangeCheckX;
+    //    @FXML
+//    private CheckBox zeroRangeCheckX;
     @FXML
     private MenuItem copyMenu;
     @FXML
@@ -132,11 +148,29 @@ public class HelloController {
     @FXML
     private ComboBox<SerialPort> portComboBox;
     private SerialPort currentPort;
-    private Status status = Status.NOT_CONNECTED;
+    private SimpleObjectProperty<Status> status = new SimpleObjectProperty<>(Status.DISCONNECTED);
     private LocalDateTime startTime;
     private File saveFile;
+    private final Watchdog connectedDog = new Watchdog(3000, () -> {
+//        System.out.println("TRIGGERED");
+        Platform.runLater(() -> {
+//            runButton.setGraphic(new FontIcon("mdi2p-play"));
+            openPortButton.setText("Open Port");
+        });
+        currentPort.closePort();
+        if (status.getValue() == Status.RUN)
+            Platform.runLater(() -> status.set(Status.INTERRUPTED));
+        else
+            Platform.runLater(() -> status.set(Status.DISCONNECTED));
+
+        Platform.runLater(() -> {
+            reloadPorts();
+            createPopup("Device disconnected!", "error-popup");
+        });
+    });
     @FXML
     protected void initialize() {
+        status.addListener(e -> statusReadout.setText(status.getValue().toString()));
         // bind enter for command bar
         cmdField.setOnKeyPressed(e -> {
             if (e.getCode().equals(KeyCode.ENTER)) submitCommand();
@@ -175,25 +209,35 @@ public class HelloController {
             sendString(".l" + nv);
             showPumpSave();
         });
-//        calibratePh.textProperty().addListener((observable, oldValue, newValue) -> {
-//            if (!newValue.matches("\\d*")) {
-//                sliderMax.setText(newValue.replaceAll("[^\\d]", ""));
-//            }
-//        });
-//        enterTime.textProperty().addListener((observable, oldValue, newValue) -> {
-//            if (!newValue.matches("\\d*")) {
-//                sliderMax.setText(newValue.replaceAll("[^\\d]", ""));
-//            }
-//        });
-//        enterPh.textProperty().addListener((observable, oldValue, newValue) -> {
-//            if (!newValue.matches("\\d*")) {
-//                sliderMax.setText(newValue.replaceAll("[^\\d]", ""));
-//            }
-//        });
+        timeUnitComboBox.setItems(FXCollections.observableArrayList(TimeUnits.values()));
+        timeUnitComboBox.getSelectionModel().select(TimeUnits.SECOND);
+        timeUnitComboBox.getSelectionModel().selectedItemProperty().addListener((obv, ov, nv) -> {
+            EditingCell.setScaleFactor(nv.getFactor());
+            tableView.refresh();
+            loadDataChart();
+        });
         calibrateComboBox.setItems(FXCollections.observableArrayList(CalibrationPoint.values()));
         calibrateComboBox.getSelectionModel().select(0);
         baudRateComboBox.setItems(FXCollections.observableArrayList(300, 1200, 2400, 9600, 19200, 38400, 57600, 115200));
         baudRateComboBox.getSelectionModel().select(3);
+        portComboBox.setCellFactory(new Callback<>() {
+            @Override
+            public ListCell<SerialPort> call(ListView<SerialPort> param) {
+                return new ListCell<>() {
+                    @Override
+                    protected void updateItem(SerialPort item, boolean empty) {
+                        super.updateItem(item, empty);
+                        if (item == null || empty) {
+                            setGraphic(null);
+                        } else {
+                            Label l = new Label(item.getPortDescription());
+                            l.setTooltip(new Tooltip(item.getSystemPortName() + "\n" + item.getManufacturer()));
+                            setGraphic(l);
+                        }
+                    }
+                };
+            }
+        });
 
         // menu
         final String os = System.getProperty("os.name");
@@ -217,15 +261,15 @@ public class HelloController {
         yAxisMax.valueProperty().addListener(e -> yAxis.setUpperBound(yAxisMax.getValue()));
         yAxisMin.valueProperty().addListener(e -> yAxis.setLowerBound(yAxisMin.getValue()));
 
-        xAxis.setForceZeroInRange(false);
-        yAxis.setForceZeroInRange(false);
-        xAxis.setAutoRanging(false);
-        yAxis.setAutoRanging(false);
+        xAxis.autoRangingProperty().bindBidirectional(autoRangeCheckX.selectedProperty());
+        yAxis.autoRangingProperty().bindBidirectional(autoRangeCheckY.selectedProperty());
+
 
         xAxis.setLabel("Time");
         yAxis.setLabel("pH");
         LineChart<Number, Number> lineChart = new LineChart<>(xAxis, yAxis);
-        lineChart.setTitle("pH");
+        lineChart.createSymbolsProperty().bind(showPointsCheck.selectedProperty());
+//        lineChart.setTitle("pH");
         series.setName("pH");
         loadDataChart();
         data.addListener((ListChangeListener<? super PhRecord>) c -> {
@@ -239,7 +283,21 @@ public class HelloController {
                     c.getRemoved().forEach(remitem -> series.getData().removeIf(remitem::equalsData));
                     c.getAddedSubList().forEach(additem -> {
                         XYChart.Data<Number, Number> d = new XYChart.Data<>();
-                        d.XValueProperty().bindBidirectional(additem.timeProperty());
+                        BidirectionalBinding<Number, Number> binding = new BidirectionalBinding<>(additem.timeProperty(), d.XValueProperty()) {
+
+                            @Override
+                            protected Number convert(Number value) {
+                                return value.doubleValue() * timeUnitComboBox.getSelectionModel().getSelectedItem().getFactor();
+                            }
+
+                            @Override
+                            protected Number inverseConvert(Number value) {
+                                return value.doubleValue() / timeUnitComboBox.getSelectionModel().getSelectedItem().getFactor();
+                            }
+
+                        };
+
+//            d.XValueProperty().bindBidirectional(r.timeProperty());
                         d.YValueProperty().bindBidirectional(additem.pHProperty());
                         series.getData().add(d);
                     });
@@ -278,21 +336,12 @@ public class HelloController {
                 deleteButton.setOnAction(event -> data.remove(r));
             }
         });
-//        tableView.getSelectionModel().getSelectedCells().addListener((ListChangeListener<? super TablePosition>) c -> {
-//
-//            for (int i = 0; i < tableView.getItems().size(); i++) {
-//                tableView.getSelectionModel().clearSelection(i,deleteCol);
-//
-//            }
-//        });
-
-        Callback<TableColumn<PhRecord, Double>, TableCell<PhRecord, Double>> cellFactory = p -> new EditingCell();
 
         timeColumn.setCellValueFactory(new PropertyValueFactory<>("time"));
-        timeColumn.setCellFactory(cellFactory);
+        timeColumn.setCellFactory(p -> new EditingCell(true));
         timeColumn.setOnEditCommit(t -> t.getTableView().getItems().get(t.getTablePosition().getRow()).setTime(t.getNewValue()));
         pHColumn.setCellValueFactory(new PropertyValueFactory<>("pH"));
-        pHColumn.setCellFactory(cellFactory);
+        pHColumn.setCellFactory(p -> new EditingCell());
         pHColumn.setOnEditCommit(t -> t.getTableView().getItems().get(t.getTablePosition().getRow()).setpH(t.getNewValue()));
 
         tableView.getColumns().add(timeColumn);
@@ -304,7 +353,7 @@ public class HelloController {
 
         // update the clock
         Timeline updateRunTime = new Timeline(new KeyFrame(Duration.millis(1), event -> {
-            if (status == Status.RUN) {
+            if (status.get() == Status.RUN || status.getValue() == Status.INTERRUPTED) {
                 runTimeLabel.setText(LocalDateTime.ofEpochSecond(0, 0, ZoneOffset.UTC).plus(java.time.Duration.between(startTime, LocalDateTime.now())).format(timeFormat));
             }
         }));
@@ -322,9 +371,13 @@ public class HelloController {
             }
         });
         autoSaveService.start();
+
+    }
+    private void createPopup(final String message, String css) {
+        createPopup(message, css, 2);
     }
 
-    private void createPopup(final String message, String css) {
+    private void createPopup(final String message, String css, int duration) {
         final Popup popup = new Popup();
         popup.setAutoFix(true);
         popup.setAutoHide(true);
@@ -335,7 +388,7 @@ public class HelloController {
         FadeTransition ft = new FadeTransition(Duration.millis(300), label);
         ft.setFromValue(1);
         ft.setToValue(0);
-        new Timeline(new KeyFrame(Duration.seconds(2), e -> ft.play())).play();
+        new Timeline(new KeyFrame(Duration.seconds(duration), e -> ft.play())).play();
 
         label.setAlignment(Pos.BASELINE_CENTER);
         label.setTextAlignment(TextAlignment.CENTER);
@@ -354,9 +407,25 @@ public class HelloController {
 
     private void loadDataChart() {
         series.getData().clear();
+
         data.forEach(r -> {
             XYChart.Data<Number, Number> d = new XYChart.Data<>();
-            d.XValueProperty().bindBidirectional(r.timeProperty());
+
+            BidirectionalBinding<Number, Number> binding = new BidirectionalBinding<>(r.timeProperty(), d.XValueProperty()) {
+
+                @Override
+                protected Number convert(Number value) {
+                    return value.doubleValue() * timeUnitComboBox.getSelectionModel().getSelectedItem().getFactor();
+                }
+
+                @Override
+                protected Number inverseConvert(Number value) {
+                    return value.doubleValue() / timeUnitComboBox.getSelectionModel().getSelectedItem().getFactor();
+                }
+
+            };
+
+//            d.XValueProperty().bindBidirectional(r.timeProperty());
             d.YValueProperty().bindBidirectional(r.pHProperty());
             series.getData().add(d);
         });
@@ -374,21 +443,24 @@ public class HelloController {
     protected void openPort() {
         SerialPort port = portComboBox.getValue();
         if (port == null) {
-            new Alert(Alert.AlertType.WARNING, "No COM port selected").show();
+            createPopup("No COM port selected", "warn-popup");
+//            new Alert(Alert.AlertType.WARNING, "No COM port selected").show();
             return;
         } else {
             if (currentPort != null && currentPort.isOpen()) {
-                if (status == Status.RUN) {
+                if (status.getValue() == Status.RUN) {
                     new Alert(Alert.AlertType.CONFIRMATION, "Closing the COM port will stop any data collection").showAndWait().filter(response -> response == ButtonType.OK).ifPresent(response -> {
-                        status = Status.STOP_READY;
+                        status.set(Status.STOP_READY);
                         currentPort.closePort();
                         openPortButton.setText("Open Port");
-                        status = Status.NOT_CONNECTED;
+                        status.set(Status.DISCONNECTED);
+                        connectedDog.stop();
                     });
                 } else {
                     currentPort.closePort();
                     openPortButton.setText("Open Port");
-                    status = Status.NOT_CONNECTED;
+                    status.set(Status.DISCONNECTED);
+                    connectedDog.stop();
                 }
 
                 return;
@@ -398,25 +470,20 @@ public class HelloController {
         currentPort = port;
         port.setComPortTimeouts(TIMEOUT_READ_SEMI_BLOCKING | TIMEOUT_WRITE_BLOCKING, TIMEOUT_READ_SEMI_BLOCKING, TIMEOUT_WRITE_BLOCKING);
         port.setBaudRate(baudRateComboBox.getValue());
-        port.openPort();
         port.addDataListener(new SerialPortMessageListener() {
             boolean firstTime = true;
-
             @Override
             public byte[] getMessageDelimiter() {
                 return new byte[]{'\r'};
             }
-
             @Override
             public boolean delimiterIndicatesEndOfMessage() {
                 return true;
             }
-
             @Override
             public int getListeningEvents() {
                 return LISTENING_EVENT_DATA_RECEIVED;
             }
-
             @Override
             public void serialEvent(SerialPortEvent event) {
                 if (firstTime) {
@@ -425,7 +492,7 @@ public class HelloController {
                 }
                 byte[] originalMessage = event.getReceivedData();
                 String omsg = new String(originalMessage);
-//                Register register = Register.values()[originalMessage[0]];
+                connectedDog.feed();
                 if (originalMessage[0] == '.') { // from the pump/water sensor side
                     byte[] payload = Arrays.copyOfRange(originalMessage, 1, originalMessage.length);
                     String smsg = new String(payload);
@@ -469,9 +536,9 @@ public class HelloController {
                             double finalPH = pH;
                             Platform.runLater(() -> digitalMeter.setText(pHMeterFormat.format(finalPH)));
                         } catch (NumberFormatException e) {
-                            System.out.println("Invalid response from probe");
+                            System.out.println("Invalid response from probe: " + omsg);
                         }
-                        if (status == Status.RUN) {
+                        if (status.getValue() == Status.RUN) {
                             if (pH != Double.MIN_VALUE) {
                                 double finalPH1 = pH;
                                 double elapsedTime = getTimeElapsed();
@@ -483,20 +550,56 @@ public class HelloController {
 
             }
         });
-        openPortButton.setText("Close Port");
-        status = Status.STOP_READY;
+
+        new Thread(() -> {
+            for (int i = 1; i <= 5; i++) {
+                if (port.openPort(100)) {
+                    Platform.runLater(() -> {
+                        openPortButton.setText("Close Port");
+                        status.set((status.getValue() == Status.INTERRUPTED) ? Status.RUN : Status.STOP_READY);
+                    });
+                    try {
+                        TimeUnit.SECONDS.sleep(3);
+                        connectedDog.start();
+                    } catch (InterruptedException ignored) {
+                    }
+                    break;
+                } else {
+                    int finalI = i;
+                    Platform.runLater(() -> createPopup("Failed to open port, attempt " + finalI + "/5.", "error-popup"));
+                    try {
+                        TimeUnit.SECONDS.sleep(1);
+                    } catch (InterruptedException e) {
+                        break;
+                    }
+                }
+            }
+        }).start();
+
     }
 
     @FXML
     protected void reloadPorts() {
         if (currentPort != null && currentPort.isOpen()) {
+            Platform.runLater(() -> {
+                status.set(Status.DISCONNECTED);
+                openPortButton.setText("Open Port");
+            });
             currentPort.closePort();
-            openPortButton.setText("Open Port");
+            connectedDog.stop();
         }
         SerialPort[] ports = SerialPort.getCommPorts();
         ObservableList<SerialPort> availablePorts = FXCollections.observableList(Arrays.stream(ports).toList());
-        portComboBox.setItems(availablePorts);
-
+        Platform.runLater(() -> {
+            portComboBox.setItems(availablePorts);
+            availablePorts.stream().filter(p -> p.getManufacturer().contains("Arduino"))
+                .findFirst()
+                .ifPresent(p -> portComboBox.getSelectionModel().select(p));
+            if (currentPort != null)
+                availablePorts.stream().filter(p -> p.getPortDescription().equals(currentPort.getPortDescription()))
+                    .findFirst()
+                    .ifPresent(p -> portComboBox.getSelectionModel().select(p));
+        });
     }
 
     @FXML
@@ -509,14 +612,15 @@ public class HelloController {
 
     @FXML
     protected void runButton() {
-        if (status == Status.STOP_READY) {
+        if (status.getValue() == Status.STOP_READY) {
             startTime = LocalDateTime.now();
             runButton.setGraphic(new FontIcon("mdi2s-stop"));
-            status = Status.RUN;
-        } else if (status == Status.RUN) {
+            status.set(Status.RUN);
+        } else if (status.getValue() == Status.RUN) {
             runButton.setGraphic(new FontIcon("mdi2p-play"));
-            status = Status.STOP_READY;
-        } else if (status == Status.NOT_CONNECTED) {
+            status.set(Status.STOP_READY);
+            connectedDog.stop();
+        } else if (status.getValue() == Status.DISCONNECTED) {
             new Alert(Alert.AlertType.ERROR, "Device is not connected.").show();
         }
     }
@@ -577,11 +681,11 @@ public class HelloController {
 
     @FXML
     protected void clearData() {
-        if (status == Status.RUN)
+        if (status.getValue() == Status.RUN)
             new Alert(Alert.AlertType.CONFIRMATION, "Clearing data will stop data collection. OK?").showAndWait().filter(r -> r.equals(ButtonType.OK)).ifPresent(r -> {
 //                    series.getData().clear();
                 data.clear();
-                status = Status.STOP_READY;
+                status.set(Status.STOP_READY);
             });
         else {
 //            series.getData().clear();

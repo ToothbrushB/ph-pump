@@ -93,18 +93,49 @@
         <BorderPane fx:id="chartView">
             <left>
                 <VBox>
-                    <DoubleTextField fx:id="yAxisMax" maxWidth="50" value="100"/>
+                    <DoubleTextField fx:id="yAxisMax" maxWidth="50" value="14" translateX="30"/>
                     <Region VBox.vgrow="ALWAYS"/>
-                    <DoubleTextField fx:id="yAxisMin" maxWidth="50" value="0"/>
+                    <DoubleTextField fx:id="yAxisMin" maxWidth="50" value="1" translateX="30" translateY="-100"/>
                 </VBox>
             </left>
             <bottom>
                 <HBox>
-                    <DoubleTextField fx:id="xAxisMin" maxWidth="50" value="0"/>
+                    <DoubleTextField fx:id="xAxisMin" maxWidth="50" value="0" translateX="70" translateY="-65"
+                                     viewOrder="-1"/>
                     <Region HBox.hgrow="ALWAYS"/>
-                    <DoubleTextField fx:id="xAxisMax" maxWidth="50" value="200"/>
+                    <DoubleTextField fx:id="xAxisMax" maxWidth="50" value="200" translateY="-65" viewOrder="-1"/>
                 </HBox>
             </bottom>
+            <top>
+                <HBox>
+                    <CheckBox text="Auto-range X" fx:id="autoRangeCheckX">
+                        <HBox.margin>
+                            <Insets topRightBottomLeft="5"/>
+                        </HBox.margin>
+                    </CheckBox>
+                    <!--                    <CheckBox text="Force zero in range X" fx:id="zeroRangeCheckX">-->
+                    <!--                        <HBox.margin>-->
+                    <!--                            <Insets topRightBottomLeft="5"/>-->
+                    <!--                        </HBox.margin>-->
+                    <!--                    </CheckBox>-->
+                    <CheckBox text="Auto-range Y" fx:id="autoRangeCheckY">
+                        <HBox.margin>
+                            <Insets topRightBottomLeft="5"/>
+                        </HBox.margin>
+                    </CheckBox>
+                    <!--                    <CheckBox text="Force zero in range Y" fx:id="zeroRangeCheckY">-->
+                    <!--                        <HBox.margin>-->
+                    <!--                            <Insets topRightBottomLeft="5"/>-->
+                    <!--                        </HBox.margin>-->
+                    <!--                    </CheckBox>-->
+                    <CheckBox text="Show points" fx:id="showPointsCheck">
+                        <HBox.margin>
+                            <Insets topRightBottomLeft="5"/>
+                        </HBox.margin>
+                    </CheckBox>
+                    <ComboBox fx:id="timeUnitComboBox"/>
+                </HBox>
+            </top>
         </BorderPane>
         <VBox>
             <padding>
@@ -143,7 +174,6 @@
             </GridPane>
         </VBox>
 
-
     </HBox>
     <HBox>
         <VBox>
@@ -173,5 +203,5 @@
         <Button text="Reload COM ports" onAction="#reloadPorts"/>
         <Button fx:id="openPortButton" text="Open Port" onAction="#openPort"/>
     </HBox>
-
+    <Label fx:id="statusReadout" text="disconnected"/>
 </VBox>
