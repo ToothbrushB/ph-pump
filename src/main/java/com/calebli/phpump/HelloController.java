@@ -47,6 +47,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -56,7 +57,10 @@ public class HelloController {
     private static final DateTimeFormatter dateTimeFormat = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
     private final DateTimeFormatter timeFormat = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
     private final NumberFormat pHMeterFormat = new DecimalFormat("#0.000");
-    private final ObservableList<PhRecord> data = FXCollections.observableList(new LinkedList<>());
+    private final ObservableList<PhRecord> data = FXCollections.synchronizedObservableList(FXCollections.observableList(new LinkedList<>()));
+    private final SimpleObjectProperty<Status> status = new SimpleObjectProperty<>(Status.DISCONNECTED);
+    private final OpenFileService openFileService = new OpenFileService();
+    private final SimpleBooleanProperty unsavedChanges = new SimpleBooleanProperty(false);
     @FXML
     private ComboBox<TimeUnits> timeUnitComboBox;
     @FXML
@@ -150,7 +154,6 @@ public class HelloController {
     @FXML
     private ComboBox<SerialPort> portComboBox;
     private SerialPort currentPort;
-    private SimpleObjectProperty<Status> status = new SimpleObjectProperty<>(Status.DISCONNECTED);
     private LocalDateTime startTime;
     private File saveFile;
     private final Watchdog connectedDog = new Watchdog(3000, () -> {
@@ -160,10 +163,8 @@ public class HelloController {
             openPortButton.setText("Open Port");
         });
         currentPort.closePort();
-        if (status.getValue() == Status.RUN)
-            Platform.runLater(() -> status.set(Status.INTERRUPTED));
-        else
-            Platform.runLater(() -> status.set(Status.DISCONNECTED));
+        if (status.getValue() == Status.RUN) Platform.runLater(() -> status.set(Status.INTERRUPTED));
+        else Platform.runLater(() -> status.set(Status.DISCONNECTED));
 
         Platform.runLater(() -> {
             reloadPorts();
@@ -171,9 +172,8 @@ public class HelloController {
         });
     });
     private LineChart<Number, Number> lineChart;
-    private OpenFileService openFileService = new OpenFileService();
-    private SimpleBooleanProperty unsavedChanges = new SimpleBooleanProperty(false);
     private ScheduledService<Boolean> autoSaveService;
+
     @FXML
     protected void initialize() {
         status.addListener(e -> statusReadout.setText(status.getValue().toString()));
@@ -240,6 +240,14 @@ public class HelloController {
             }
         });
 
+        unsavedChanges.addListener((obv, ov, nv) -> {
+            if (nv) {
+                HelloApplication.setTitle("*" + HelloApplication.getTitle());
+            } else if (HelloApplication.getTitle().startsWith("*")) {
+                HelloApplication.setTitle(HelloApplication.getTitle().substring(1));
+            }
+        });
+
         openFileService.setOnSucceeded(v -> {
             if (openFileService.getValue())
                 Platform.runLater(() -> createPopup("File opened successfully", "good-popup"));
@@ -249,8 +257,7 @@ public class HelloController {
         });
         // menu
         final String os = System.getProperty("os.name");
-        if (os != null && os.startsWith("Mac"))
-            menuBar.useSystemMenuBarProperty().set(true);
+        if (os != null && os.startsWith("Mac")) menuBar.useSystemMenuBarProperty().set(true);
         openMenu.setAccelerator(KeyCombination.keyCombination("Shortcut+O"));
         saveMenu.setAccelerator(KeyCombination.keyCombination("Shortcut+S"));
         saveAsMenu.setAccelerator(KeyCombination.keyCombination("Shortcut+Shift+S"));
@@ -272,12 +279,10 @@ public class HelloController {
         xAxis.autoRangingProperty().bindBidirectional(autoRangeCheckX.selectedProperty());
         yAxis.autoRangingProperty().bindBidirectional(autoRangeCheckY.selectedProperty());
 
-
         xAxis.setLabel("Time");
         yAxis.setLabel("pH");
         lineChart = new LineChart<>(xAxis, yAxis);
         lineChart.createSymbolsProperty().bind(showPointsCheck.selectedProperty());
-//        lineChart.setTitle("pH");
         loadDataChart();
         data.addListener((ListChangeListener<? super PhRecord>) c -> {
             unsavedChanges.set(true);
@@ -356,8 +361,7 @@ public class HelloController {
             fileChoiceDialog.setTitle("Load Auto-Save");
             fileChoiceDialog.setHeaderText("Auto-Save Files Found");
             fileChoiceDialog.setContentText("Select file to load: ");
-            fileChoiceDialog.showAndWait()
-                .ifPresent(openFileService::openIt);
+            fileChoiceDialog.showAndWait().ifPresent(openFileService::openIt);
         }
 
         // autosave
@@ -483,18 +487,22 @@ public class HelloController {
         port.setBaudRate(baudRateComboBox.getValue());
         port.addDataListener(new SerialPortMessageListener() {
             boolean firstTime = true;
+
             @Override
             public byte[] getMessageDelimiter() {
                 return new byte[]{'\r'};
             }
+
             @Override
             public boolean delimiterIndicatesEndOfMessage() {
                 return true;
             }
+
             @Override
             public int getListeningEvents() {
                 return LISTENING_EVENT_DATA_RECEIVED;
             }
+
             @Override
             public void serialEvent(SerialPortEvent event) {
                 if (firstTime) {
@@ -603,13 +611,9 @@ public class HelloController {
         ObservableList<SerialPort> availablePorts = FXCollections.observableList(Arrays.stream(ports).toList());
         Platform.runLater(() -> {
             portComboBox.setItems(availablePorts);
-            availablePorts.stream().filter(p -> p.getManufacturer().contains("Arduino"))
-                .findFirst()
-                .ifPresent(p -> portComboBox.getSelectionModel().select(p));
+            availablePorts.stream().filter(p -> p.getManufacturer().contains("Arduino")).findFirst().ifPresent(p -> portComboBox.getSelectionModel().select(p));
             if (currentPort != null)
-                availablePorts.stream().filter(p -> p.getPortDescription().equals(currentPort.getPortDescription()))
-                    .findFirst()
-                    .ifPresent(p -> portComboBox.getSelectionModel().select(p));
+                availablePorts.stream().filter(p -> p.getPortDescription().equals(currentPort.getPortDescription())).findFirst().ifPresent(p -> portComboBox.getSelectionModel().select(p));
         });
     }
 
@@ -626,8 +630,7 @@ public class HelloController {
         if (status.getValue() == Status.STOP_READY) {
             startTime = LocalDateTime.now();
             runButton.setGraphic(new FontIcon("mdi2s-stop"));
-            if (autoSaveService.getState().equals(Worker.State.READY))
-                autoSaveService.start();
+            if (autoSaveService.getState().equals(Worker.State.READY)) autoSaveService.start();
             status.set(Status.RUN);
 
         } else if (status.getValue() == Status.RUN) {
@@ -646,9 +649,9 @@ public class HelloController {
         File file = chooser.showOpenDialog(openButton.getScene().getWindow());
 
         if (file == null) return;
+        saveFile = file;
         openFileService.openIt(file);
     }
-
 
     @FXML
     protected void save() {
@@ -687,6 +690,8 @@ public class HelloController {
             }
         }
         createPopup("Saved", "good-popup");
+        HelloApplication.setTitle(HelloApplication.MAIN_TITLE + " - " + saveFile.getName());
+
         unsavedChanges.set(false);
     }
 
@@ -752,9 +757,6 @@ public class HelloController {
         File file = chooser.showSaveDialog(saveButton.getScene().getWindow());
         if (file == null) return;
         saveFile = file;
-
-        CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader("Time", "pH").build();
-
         saveToFile();
     }
 
@@ -779,14 +781,10 @@ public class HelloController {
             int r = p.getRow();
             int c = p.getColumn();
             Object cell = tableView.getColumns().get(c).getCellData(r);
-            if (cell == null)
-                cell = "";
-            if (old_r == r)
-                clipboardString.append('\t');
-            else if (old_r != -1)
-                clipboardString.append('\n');
-            if (cell instanceof Number || cell instanceof String)
-                clipboardString.append(cell);
+            if (cell == null) cell = "";
+            if (old_r == r) clipboardString.append('\t');
+            else if (old_r != -1) clipboardString.append('\n');
+            if (cell instanceof Number || cell instanceof String) clipboardString.append(cell);
             old_r = r;
         }
         final ClipboardContent content = new ClipboardContent();
@@ -838,8 +836,7 @@ public class HelloController {
                     File[] toDelete = new File(System.getProperty("user.home")).listFiles((dir, name) -> name.startsWith("phpump_autosave_"));
                     if (toDelete != null) {
                         for (File f : toDelete) {
-                            if (!f.delete())
-                                success.set(false);
+                            if (!f.delete()) success.set(false);
                         }
                     }
 
@@ -880,8 +877,7 @@ public class HelloController {
 
         public void openIt(File f) {
             file = f;
-            if (!this.getState().equals(State.READY))
-                this.reset();
+            if (!this.getState().equals(State.READY)) this.reset();
             this.start();
         }
 
@@ -894,11 +890,15 @@ public class HelloController {
                     Platform.runLater(() -> createPopup("Opening file", "warn-popup"));
                     CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader("Time", "pH").build();
                     try (FileReader fr = new FileReader(file); final CSVParser parse = new CSVParser(new BufferedReader(fr), csvFormat)) {
-                        data.clear();
-                        data.addAll(parse.stream().skip(1).map(r -> new PhRecord(Double.parseDouble(r.get(0)), Double.parseDouble(r.get(1)))).toList());
-                        loadDataChart();
+                        List<PhRecord> records = parse.stream().skip(1).map(r -> new PhRecord(Double.parseDouble(r.get(0)), Double.parseDouble(r.get(1)))).toList();
+                        Platform.runLater(() -> {
+                            data.clear();
+                            data.addAll(records);
+                            loadDataChart();
+                            HelloApplication.setTitle(HelloApplication.MAIN_TITLE + " - " + file.getName());
+                            unsavedChanges.set(false);
+                        });
                     } catch (IOException e) {
-                        e.printStackTrace();
                         success = false;
                     }
                     return success;
@@ -906,4 +906,6 @@ public class HelloController {
             };
         }
     }
+
+
 }

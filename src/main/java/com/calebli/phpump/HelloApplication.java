@@ -1,17 +1,36 @@
 package com.calebli.phpump;
 
 import javafx.application.Application;
-import javafx.event.EventHandler;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
-import javafx.stage.WindowEvent;
 
 import java.io.IOException;
 import java.util.Objects;
 
 public class HelloApplication extends Application {
+    public static final String MAIN_TITLE = "pH Probe and Pump Interface";
+    public static StringProperty title = new SimpleStringProperty(MAIN_TITLE);
+
+    public static String getTitle() {
+        return title.get();
+    }
+
+    public static void setTitle(String title) {
+        HelloApplication.title.set(title);
+    }
+
+    public static StringProperty titleProperty() {
+        return title;
+    }
+
+    public static void main(String[] args) {
+        launch();
+    }
+
     @Override
     public void start(Stage stage) throws IOException {
 
@@ -21,20 +40,14 @@ public class HelloApplication extends Application {
         HelloController appCtrl = fxmlLoader.getController();
 
         scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/CSS/style.css")).toExternalForm());
-        stage.setTitle("pH Probe and Pump Interface");
+        stage.titleProperty().bind(title);
         stage.setScene(scene);
         stage.show();
 
-        scene.getWindow().setOnCloseRequest(new EventHandler<WindowEvent>() {
-            public void handle(WindowEvent ev) {
-                if (!appCtrl.shutdown()) {
-                    ev.consume();
-                }
+        scene.getWindow().setOnCloseRequest(ev -> {
+            if (!appCtrl.shutdown()) {
+                ev.consume();
             }
         });
-    }
-
-    public static void main(String[] args) {
-        launch();
     }
 }
