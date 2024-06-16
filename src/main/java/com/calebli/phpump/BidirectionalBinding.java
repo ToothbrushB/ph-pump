@@ -34,7 +34,6 @@ public abstract class BidirectionalBinding<S, T> {
 
         this.property1 = property1;
         this.property2 = property2;
-        property2.setValue(convert(property1.getValue()));
 
         listener = o -> {
             if (!calculating) {

@@ -8,12 +8,15 @@ import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyObjectWrapper;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.concurrent.ScheduledService;
+import javafx.concurrent.Service;
 import javafx.concurrent.Task;
+import javafx.concurrent.Worker;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
 import javafx.scene.chart.LineChart;
@@ -51,7 +54,6 @@ import static com.fazecast.jSerialComm.SerialPort.*;
 
 public class HelloController {
     private static final DateTimeFormatter dateTimeFormat = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-    private final XYChart.Series<Number, Number> series = new XYChart.Series<>();
     private final DateTimeFormatter timeFormat = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
     private final NumberFormat pHMeterFormat = new DecimalFormat("#0.000");
     private final ObservableList<PhRecord> data = FXCollections.observableList(new LinkedList<>());
@@ -168,6 +170,10 @@ public class HelloController {
             createPopup("Device disconnected!", "error-popup");
         });
     });
+    private LineChart<Number, Number> lineChart;
+    private OpenFileService openFileService = new OpenFileService();
+    private SimpleBooleanProperty unsavedChanges = new SimpleBooleanProperty(false);
+    private ScheduledService<Boolean> autoSaveService;
     @FXML
     protected void initialize() {
         status.addListener(e -> statusReadout.setText(status.getValue().toString()));
@@ -181,13 +187,7 @@ public class HelloController {
         enterTime.setOnKeyPressed(e -> {
             if (e.getCode().equals(KeyCode.ENTER)) addEntry();
         });
-//        consoleText.textProperty().addListener((ChangeListener<Object>) (observable, oldValue, newValue) -> {
-//            System.out.println(autoScrollCheckBox.isSelected());
-//            if (autoScrollCheckBox.isSelected())
-//                consoleText.setScrollTop(Double.MAX_VALUE); //this will scroll to the bottom
-//            else
-//                consoleText.setScrollTop(consoleText.getLength());
-//        });
+
         sliderMax.textProperty().addListener(e -> waterLevelSlider.setMax(sliderMax.getValue()));
         sliderMin.textProperty().addListener(e -> waterLevelSlider.setMax(sliderMin.getValue()));
 
@@ -214,7 +214,8 @@ public class HelloController {
         timeUnitComboBox.getSelectionModel().selectedItemProperty().addListener((obv, ov, nv) -> {
             EditingCell.setScaleFactor(nv.getFactor());
             tableView.refresh();
-            loadDataChart();
+            lineChart.getData().clear();
+            lineChart.getData().add(nv.getSeries());
         });
         calibrateComboBox.setItems(FXCollections.observableArrayList(CalibrationPoint.values()));
         calibrateComboBox.getSelectionModel().select(0);
@@ -239,6 +240,13 @@ public class HelloController {
             }
         });
 
+        openFileService.setOnSucceeded(v -> {
+            if (openFileService.getValue())
+                Platform.runLater(() -> createPopup("File opened successfully", "good-popup"));
+
+            else Platform.runLater(() -> createPopup("File read error", "error-popup"));
+
+        });
         // menu
         final String os = System.getProperty("os.name");
         if (os != null && os.startsWith("Mac"))
@@ -267,12 +275,12 @@ public class HelloController {
 
         xAxis.setLabel("Time");
         yAxis.setLabel("pH");
-        LineChart<Number, Number> lineChart = new LineChart<>(xAxis, yAxis);
+        lineChart = new LineChart<>(xAxis, yAxis);
         lineChart.createSymbolsProperty().bind(showPointsCheck.selectedProperty());
 //        lineChart.setTitle("pH");
-        series.setName("pH");
         loadDataChart();
         data.addListener((ListChangeListener<? super PhRecord>) c -> {
+            unsavedChanges.set(true);
             while (c.next()) {
                 // don't care about permute bc order doesn't matter in a chart
                 if (c.wasUpdated()) {
@@ -280,31 +288,23 @@ public class HelloController {
                     // since we have no idea which element changed bc we don't keep track of indices, we have no choice but to rebuild the entire list
                     loadDataChart();
                 } else {
-                    c.getRemoved().forEach(remitem -> series.getData().removeIf(remitem::equalsData));
+                    c.getRemoved().forEach(remitem -> {
+                        for (TimeUnits unit : TimeUnits.values())
+                            unit.getSeries().getData().removeIf(d -> remitem.equalsData(d, unit));
+                    });
                     c.getAddedSubList().forEach(additem -> {
-                        XYChart.Data<Number, Number> d = new XYChart.Data<>();
-                        BidirectionalBinding<Number, Number> binding = new BidirectionalBinding<>(additem.timeProperty(), d.XValueProperty()) {
-
-                            @Override
-                            protected Number convert(Number value) {
-                                return value.doubleValue() * timeUnitComboBox.getSelectionModel().getSelectedItem().getFactor();
-                            }
-
-                            @Override
-                            protected Number inverseConvert(Number value) {
-                                return value.doubleValue() / timeUnitComboBox.getSelectionModel().getSelectedItem().getFactor();
-                            }
-
-                        };
-
-//            d.XValueProperty().bindBidirectional(r.timeProperty());
-                        d.YValueProperty().bindBidirectional(additem.pHProperty());
-                        series.getData().add(d);
+                        for (TimeUnits unit : TimeUnits.values()) {
+                            XYChart.Data<Number, Number> d = new XYChart.Data<>();
+                            new BidirectionalTimeBinding(additem.timeProperty(), d.XValueProperty(), unit);
+                            d.YValueProperty().bindBidirectional(additem.pHProperty());
+                            unit.getSeries().getData().add(d);
+                        }
                     });
                 }
             }
         });
-        lineChart.getData().add(series);
+        lineChart.getData().add(TimeUnits.SECOND.getSeries());
+        lineChart.setAnimated(false);
         chartView.setCenter(lineChart);
 
         // set up the table
@@ -318,6 +318,62 @@ public class HelloController {
         TableColumn<PhRecord, Double> pHColumn = new TableColumn<>("pH");
         pHColumn.setMinWidth(100);
 
+        TableColumn<PhRecord, PhRecord> deleteCol = getPhRecordPhRecordTableColumn();
+
+        timeColumn.setCellValueFactory(new PropertyValueFactory<>("time"));
+        timeColumn.setCellFactory(p -> new EditingCell(true));
+        timeColumn.setOnEditCommit(t -> {
+            t.getTableView().getItems().get(t.getTablePosition().getRow()).setTime(t.getNewValue());
+            unsavedChanges.set(true);
+        });
+        pHColumn.setCellValueFactory(new PropertyValueFactory<>("pH"));
+        pHColumn.setCellFactory(p -> new EditingCell());
+        pHColumn.setOnEditCommit(t -> {
+            t.getTableView().getItems().get(t.getTablePosition().getRow()).setpH(t.getNewValue());
+            unsavedChanges.set(true);
+        });
+
+        tableView.getColumns().add(timeColumn);
+        tableView.getColumns().add(pHColumn);
+        tableView.getColumns().add(deleteCol);
+
+        tableView.setItems(data);
+
+
+        // update the clock
+        Timeline updateRunTime = new Timeline(new KeyFrame(Duration.millis(5), event -> {
+            if (status.get() == Status.RUN || status.getValue() == Status.INTERRUPTED) {
+                runTimeLabel.setText(LocalDateTime.ofEpochSecond(0, 0, ZoneOffset.UTC).plus(java.time.Duration.between(startTime, LocalDateTime.now())).format(timeFormat));
+            }
+        }));
+        updateRunTime.setCycleCount(Timeline.INDEFINITE);
+        updateRunTime.play();
+
+        // ask for autosaves
+        File[] autosaves = new File(System.getProperty("user.home")).listFiles((dir, name) -> name.startsWith("phpump_autosave_"));
+        if (autosaves != null && autosaves.length > 0) {
+            ChoiceDialog<File> fileChoiceDialog = new ChoiceDialog<>(autosaves[0], autosaves);
+            fileChoiceDialog.setTitle("Load Auto-Save");
+            fileChoiceDialog.setHeaderText("Auto-Save Files Found");
+            fileChoiceDialog.setContentText("Select file to load: ");
+            fileChoiceDialog.showAndWait()
+                .ifPresent(openFileService::openIt);
+        }
+
+        // autosave
+        autoSaveService = new AutoSaveService();
+        autoSaveService.setPeriod(Duration.seconds(60));
+        autoSaveService.setOnSucceeded(e -> {
+            if (autoSaveService.getValue()) {
+                createPopup("Auto-save success", "good-popup");
+            } else {
+                createPopup("Auto-save failed", "error-popup");
+            }
+        });
+
+    }
+
+    private TableColumn<PhRecord, PhRecord> getPhRecordPhRecordTableColumn() {
         TableColumn<PhRecord, PhRecord> deleteCol = new TableColumn<>("Delete");
         deleteCol.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
         deleteCol.setCellFactory(param -> new TableCell<>() {
@@ -336,43 +392,9 @@ public class HelloController {
                 deleteButton.setOnAction(event -> data.remove(r));
             }
         });
-
-        timeColumn.setCellValueFactory(new PropertyValueFactory<>("time"));
-        timeColumn.setCellFactory(p -> new EditingCell(true));
-        timeColumn.setOnEditCommit(t -> t.getTableView().getItems().get(t.getTablePosition().getRow()).setTime(t.getNewValue()));
-        pHColumn.setCellValueFactory(new PropertyValueFactory<>("pH"));
-        pHColumn.setCellFactory(p -> new EditingCell());
-        pHColumn.setOnEditCommit(t -> t.getTableView().getItems().get(t.getTablePosition().getRow()).setpH(t.getNewValue()));
-
-        tableView.getColumns().add(timeColumn);
-        tableView.getColumns().add(pHColumn);
-        tableView.getColumns().add(deleteCol);
-
-        tableView.setItems(data);
-
-
-        // update the clock
-        Timeline updateRunTime = new Timeline(new KeyFrame(Duration.millis(1), event -> {
-            if (status.get() == Status.RUN || status.getValue() == Status.INTERRUPTED) {
-                runTimeLabel.setText(LocalDateTime.ofEpochSecond(0, 0, ZoneOffset.UTC).plus(java.time.Duration.between(startTime, LocalDateTime.now())).format(timeFormat));
-            }
-        }));
-        updateRunTime.setCycleCount(Timeline.INDEFINITE);
-        updateRunTime.play();
-
-        // autosave
-        ScheduledService<Boolean> autoSaveService = new AutoSaveService();
-        autoSaveService.setPeriod(Duration.seconds(60));
-        autoSaveService.setOnSucceeded(e -> {
-            if (autoSaveService.getValue()) {
-                createPopup("Auto-save success", "good-popup");
-            } else {
-                createPopup("Auto-save failed", "error-popup");
-            }
-        });
-        autoSaveService.start();
-
+        return deleteCol;
     }
+
     private void createPopup(final String message, String css) {
         createPopup(message, css, 2);
     }
@@ -406,29 +428,18 @@ public class HelloController {
     }
 
     private void loadDataChart() {
-        series.getData().clear();
+        for (TimeUnits unit : TimeUnits.values()) {
+            unit.getSeries().getData().clear();
 
-        data.forEach(r -> {
-            XYChart.Data<Number, Number> d = new XYChart.Data<>();
+            data.forEach(r -> {
+                XYChart.Data<Number, Number> d = new XYChart.Data<>();
+                new BidirectionalTimeBinding(r.timeProperty(), d.XValueProperty(), unit);
+                d.YValueProperty().bindBidirectional(r.pHProperty());
+                unit.getSeries().getData().add(d);
+            });
+        }
 
-            BidirectionalBinding<Number, Number> binding = new BidirectionalBinding<>(r.timeProperty(), d.XValueProperty()) {
 
-                @Override
-                protected Number convert(Number value) {
-                    return value.doubleValue() * timeUnitComboBox.getSelectionModel().getSelectedItem().getFactor();
-                }
-
-                @Override
-                protected Number inverseConvert(Number value) {
-                    return value.doubleValue() / timeUnitComboBox.getSelectionModel().getSelectedItem().getFactor();
-                }
-
-            };
-
-//            d.XValueProperty().bindBidirectional(r.timeProperty());
-            d.YValueProperty().bindBidirectional(r.pHProperty());
-            series.getData().add(d);
-        });
     }
 
     private void sendString(String s) {
@@ -615,11 +626,13 @@ public class HelloController {
         if (status.getValue() == Status.STOP_READY) {
             startTime = LocalDateTime.now();
             runButton.setGraphic(new FontIcon("mdi2s-stop"));
+            if (autoSaveService.getState().equals(Worker.State.READY))
+                autoSaveService.start();
             status.set(Status.RUN);
+
         } else if (status.getValue() == Status.RUN) {
             runButton.setGraphic(new FontIcon("mdi2p-play"));
             status.set(Status.STOP_READY);
-            connectedDog.stop();
         } else if (status.getValue() == Status.DISCONNECTED) {
             new Alert(Alert.AlertType.ERROR, "Device is not connected.").show();
         }
@@ -633,16 +646,9 @@ public class HelloController {
         File file = chooser.showOpenDialog(openButton.getScene().getWindow());
 
         if (file == null) return;
-
-        CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader("Time", "pH").build();
-        try (final CSVParser parse = new CSVParser(new BufferedReader(new FileReader(file)), csvFormat)) {
-            data.clear();
-            data.addAll(parse.stream().skip(1).map(r -> new PhRecord(Double.parseDouble(r.get(0)), Double.parseDouble(r.get(1)))).toList());
-        } catch (IOException e) {
-            new Alert(Alert.AlertType.ERROR, "File read error\n" + e).show();
-        }
-
+        openFileService.openIt(file);
     }
+
 
     @FXML
     protected void save() {
@@ -655,7 +661,11 @@ public class HelloController {
             if (file == null) return;
             saveFile = file;
         }
+        saveToFile();
 
+    }
+
+    private void saveToFile() {
         CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader("Time", "pH").build();
 
         try (final CSVPrinter printer = new CSVPrinter(new BufferedWriter(new FileWriter(saveFile)), csvFormat)) {
@@ -670,6 +680,14 @@ public class HelloController {
         } catch (IOException e) {
             new Alert(Alert.AlertType.ERROR, "File save error\n" + e).show();
         }
+        File[] toDelete = new File(System.getProperty("user.home")).listFiles((dir, name) -> name.startsWith("phpump_autosave_"));
+        if (toDelete != null) {
+            for (File f : toDelete) {
+                f.delete();
+            }
+        }
+        createPopup("Saved", "good-popup");
+        unsavedChanges.set(false);
     }
 
     @FXML
@@ -737,18 +755,7 @@ public class HelloController {
 
         CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader("Time", "pH").build();
 
-        try (final CSVPrinter printer = new CSVPrinter(new BufferedWriter(new FileWriter(saveFile)), csvFormat)) {
-            data.forEach(r -> {
-                try {
-                    printer.printRecord(r.getTime(), r.getpH());
-                } catch (IOException e) {
-                    new Alert(Alert.AlertType.ERROR, "File save error\n" + e).show();
-                }
-
-            });
-        } catch (IOException e) {
-            new Alert(Alert.AlertType.ERROR, "File save error\n" + e).show();
-        }
+        saveToFile();
     }
 
     @FXML
@@ -787,6 +794,37 @@ public class HelloController {
         Clipboard.getSystemClipboard().setContent(content);
     }
 
+    public boolean shutdown() {
+        if (unsavedChanges.get()) {
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("Unsaved Changes");
+            alert.setHeaderText("You have unsaved changes");
+            alert.setContentText("What do you want to do?");
+
+            ButtonType btSave = new ButtonType("Save");
+            ButtonType btSaveAs = new ButtonType("Save As");
+            ButtonType btDiscard = new ButtonType("Discard and Close");
+            ButtonType btCancel = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+
+            alert.getButtonTypes().setAll(btSave, btSaveAs, btDiscard, btCancel);
+            AtomicBoolean doIt = new AtomicBoolean(true);
+            alert.showAndWait().ifPresent(bt -> {
+                if (bt.equals(btSave)) {
+                    save();
+                } else if (bt.equals(btSaveAs)) {
+                    saveAs();
+                } else if (bt.equals(btDiscard)) {
+
+                } else {
+                    doIt.set(false);
+                }
+            });
+            return doIt.get();
+        }
+        return true;
+
+    }
+
     private class AutoSaveService extends ScheduledService<Boolean> {
 
         @Override
@@ -808,37 +846,23 @@ public class HelloController {
                     File file = new File(System.getProperty("user.home") + "/phpump_autosave_" + (LocalDateTime.now().format(dateTimeFormat)) + ".csv");
                     CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader("Time", "pH").build();
 
-                    try (final CSVPrinter printer = new CSVPrinter(new BufferedWriter(new FileWriter(file)), csvFormat)) {
-                        data.forEach(r -> {
-                            try {
-                                printer.printRecord(r.getTime(), r.getpH());
-                            } catch (IOException e) {
-//                                e.printStackTrace();
-//                                new Alert(Alert.AlertType.ERROR, "File save error\n" + e).show();
-                                success.set(false);
-                            }
-
-                        });
-                    } catch (IOException e) {
-//                        e.printStackTrace();
-//                        new Alert(Alert.AlertType.ERROR, "File save error\n" + e).show();
-                        success.set(false);
-                    }
-
                     if (saveFile != null) {
-                        try (final CSVPrinter printer = new CSVPrinter(new BufferedWriter(new FileWriter(saveFile)), csvFormat)) {
+                        saveToFile();
+                    } else {
+                        try (final CSVPrinter printer = new CSVPrinter(new BufferedWriter(new FileWriter(file)), csvFormat)) {
                             data.forEach(r -> {
                                 try {
                                     printer.printRecord(r.getTime(), r.getpH());
                                 } catch (IOException e) {
-//                                    e.printStackTrace();
+//                                e.printStackTrace();
 //                                new Alert(Alert.AlertType.ERROR, "File save error\n" + e).show();
                                     success.set(false);
                                 }
 
                             });
                         } catch (IOException e) {
-//                            e.printStackTrace();
+//                        e.printStackTrace();
+//                        new Alert(Alert.AlertType.ERROR, "File save error\n" + e).show();
                             success.set(false);
                         }
                     }
@@ -846,6 +870,38 @@ public class HelloController {
                     return success.get();
 
 
+                }
+            };
+        }
+    }
+
+    private class OpenFileService extends Service<Boolean> {
+        private File file;
+
+        public void openIt(File f) {
+            file = f;
+            if (!this.getState().equals(State.READY))
+                this.reset();
+            this.start();
+        }
+
+        @Override
+        protected Task<Boolean> createTask() {
+            return new Task<>() {
+                @Override
+                protected Boolean call() {
+                    boolean success = true;
+                    Platform.runLater(() -> createPopup("Opening file", "warn-popup"));
+                    CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader("Time", "pH").build();
+                    try (FileReader fr = new FileReader(file); final CSVParser parse = new CSVParser(new BufferedReader(fr), csvFormat)) {
+                        data.clear();
+                        data.addAll(parse.stream().skip(1).map(r -> new PhRecord(Double.parseDouble(r.get(0)), Double.parseDouble(r.get(1)))).toList());
+                        loadDataChart();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        success = false;
+                    }
+                    return success;
                 }
             };
         }

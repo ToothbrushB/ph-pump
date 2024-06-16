@@ -37,8 +37,10 @@ public class Watchdog {
                     Thread.currentThread().interrupt();
                     break;
                 }
-                if (status == Status.STOPPED)
+                if (status == Status.STOPPED || Thread.currentThread().isInterrupted()) {
                     Thread.currentThread().interrupt();
+                    break;
+                }
             }
         });
         check.start();

@@ -38,8 +38,9 @@ public final class PhRecord {
         this.pH.set(pH);
     }
 
-    public boolean equalsData(XYChart.Data<Number, Number> data) {
-        return data.getXValue().equals(this.getTime()) && data.getYValue().equals(this.getpH());
+    public boolean equalsData(XYChart.Data<Number, Number> data, TimeUnits units) {
+        return Math.abs(data.getXValue().doubleValue() - this.getTime() * units.getFactor()) < 1.0E-20 &&
+            Math.abs(data.getYValue().doubleValue() - this.getpH()) < 1.0E-20;
     }
 
 //    @Override
