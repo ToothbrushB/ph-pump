@@ -87,23 +87,27 @@
                     </graphic>
                 </Button>
             </HBox>
-            <Label fx:id="digitalMeter" text="0.00" textAlignment="CENTER" alignment="CENTER"
-                   styleClass="digital-meter"/>
+            <HBox>
+                <Label text="pH =" styleClass="digital-meter"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="digitalMeter" text="0.00" textAlignment="CENTER" alignment="CENTER"
+                       styleClass="digital-meter"/>
+            </HBox>
+
         </VBox>
         <BorderPane fx:id="chartView">
             <left>
-                <VBox>
+                <VBox viewOrder="-1">
                     <DoubleTextField fx:id="yAxisMax" maxWidth="50" value="14" translateX="30"/>
                     <Region VBox.vgrow="ALWAYS"/>
                     <DoubleTextField fx:id="yAxisMin" maxWidth="50" value="1" translateX="30" translateY="-100"/>
                 </VBox>
             </left>
             <bottom>
-                <HBox>
-                    <DoubleTextField fx:id="xAxisMin" maxWidth="50" value="0" translateX="70" translateY="-65"
-                                     viewOrder="-1"/>
+                <HBox viewOrder="-1">
+                    <DoubleTextField fx:id="xAxisMin" maxWidth="50" value="0" translateX="70" translateY="-65"/>
                     <Region HBox.hgrow="ALWAYS"/>
-                    <DoubleTextField fx:id="xAxisMax" maxWidth="50" value="200" translateY="-65" viewOrder="-1"/>
+                    <DoubleTextField fx:id="xAxisMax" maxWidth="50" value="200" translateY="-65"/>
                 </HBox>
             </bottom>
             <top>

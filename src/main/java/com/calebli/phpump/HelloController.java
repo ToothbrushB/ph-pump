@@ -156,6 +156,7 @@ public class HelloController {
     private SerialPort currentPort;
     private LocalDateTime startTime;
     private File saveFile;
+    private NormalSaveService saveService = new NormalSaveService();
     private final Watchdog connectedDog = new Watchdog(3000, () -> {
 //        System.out.println("TRIGGERED");
         Platform.runLater(() -> {
@@ -373,6 +374,17 @@ public class HelloController {
             } else {
                 createPopup("Auto-save failed", "error-popup");
             }
+        });
+
+        saveService.setOnSucceeded(e -> {
+            if (saveService.getValue()) {
+                createPopup("Saved", "good-popup");
+                HelloApplication.setTitle(HelloApplication.MAIN_TITLE + " - " + saveFile.getName());
+                unsavedChanges.set(false);
+            } else {
+                createPopup("Save failed", "error-popup");
+            }
+            saveService.reset();
         });
 
     }
@@ -664,7 +676,7 @@ public class HelloController {
             if (file == null) return;
             saveFile = file;
         }
-        saveToFile();
+        saveService.start();
 
     }
 
@@ -757,7 +769,7 @@ public class HelloController {
         File file = chooser.showSaveDialog(saveButton.getScene().getWindow());
         if (file == null) return;
         saveFile = file;
-        saveToFile();
+        saveService.start();
     }
 
     @FXML
@@ -821,6 +833,40 @@ public class HelloController {
         }
         return true;
 
+    }
+
+    private class NormalSaveService extends Service<Boolean> {
+        @Override
+        protected Task<Boolean> createTask() {
+            return new Task<>() {
+                @Override
+                protected Boolean call() {
+                    AtomicBoolean success = new AtomicBoolean(true);
+                    CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader("Time", "pH").build();
+
+                    try (final CSVPrinter printer = new CSVPrinter(new BufferedWriter(new FileWriter(saveFile)), csvFormat)) {
+                        data.forEach(r -> {
+                            try {
+                                printer.printRecord(r.getTime(), r.getpH());
+                            } catch (IOException e) {
+                                success.set(false);
+                            }
+
+                        });
+                    } catch (IOException e) {
+                        success.set(false);
+                    }
+                    File[] toDelete = new File(System.getProperty("user.home")).listFiles((dir, name) -> name.startsWith("phpump_autosave_"));
+                    if (toDelete != null) {
+                        for (File f : toDelete) {
+                            f.delete();
+                        }
+                    }
+
+                    return success.get();
+                }
+            };
+        }
     }
 
     private class AutoSaveService extends ScheduledService<Boolean> {

@@ -18,24 +18,24 @@ public final class PhRecord {
         return time.get();
     }
 
-    public DoubleProperty timeProperty() {
-        return time;
-    }
-
     public void setTime(double time) {
         this.time.set(time);
+    }
+
+    public DoubleProperty timeProperty() {
+        return time;
     }
 
     public double getpH() {
         return pH.get();
     }
 
-    public DoubleProperty pHProperty() {
-        return pH;
-    }
-
     public void setpH(double pH) {
         this.pH.set(pH);
+    }
+
+    public DoubleProperty pHProperty() {
+        return pH;
     }
 
     public boolean equalsData(XYChart.Data<Number, Number> data, TimeUnits units) {

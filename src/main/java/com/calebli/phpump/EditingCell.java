@@ -9,9 +9,9 @@ import javafx.scene.input.KeyCode;
 
 class EditingCell extends TableCell<PhRecord, Double> {
 
+    private static final DoubleProperty scaleFactor = new SimpleDoubleProperty(1);
     private DoubleTextField textField;
-    private static DoubleProperty scaleFactor = new SimpleDoubleProperty(1);
-    private BooleanProperty useScaleFactor = new SimpleBooleanProperty();
+    private final BooleanProperty useScaleFactor = new SimpleBooleanProperty();
 
     public EditingCell() {
     }
@@ -24,12 +24,12 @@ class EditingCell extends TableCell<PhRecord, Double> {
         return scaleFactor.get();
     }
 
-    public static DoubleProperty scaleFactorProperty() {
-        return scaleFactor;
-    }
-
     public static void setScaleFactor(double scaleFactor) {
         EditingCell.scaleFactor.set(scaleFactor);
+    }
+
+    public static DoubleProperty scaleFactorProperty() {
+        return scaleFactor;
     }
 
     @Override

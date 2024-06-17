@@ -7,25 +7,8 @@ public abstract class BidirectionalBinding<S, T> {
 
     protected final Property<S> property1;
     protected final Property<T> property2;
-
-    protected boolean calculating = false;
     private final InvalidationListener listener;
-
-    /**
-     * Convert value for property 1 to value for property 2
-     *
-     * @param value
-     * @return
-     */
-    protected abstract T convert(S value);
-
-    /**
-     * Convert value for property 2 to value for property 1
-     *
-     * @param value
-     * @return
-     */
-    protected abstract S inverseConvert(T value);
+    protected boolean calculating = false;
 
     protected BidirectionalBinding(Property<S> property1, Property<T> property2) {
         if (property2.isBound() || property1 == null) {
@@ -56,6 +39,22 @@ public abstract class BidirectionalBinding<S, T> {
         property1.addListener(listener);
         property2.addListener(listener);
     }
+
+    /**
+     * Convert value for property 1 to value for property 2
+     *
+     * @param value value with type of property 1
+     * @return converted value with type of property 2
+     */
+    protected abstract T convert(S value);
+
+    /**
+     * Convert value for property 2 to value for property 1
+     *
+     * @param value value with type of property 2
+     * @return converted value with type of property 1
+     */
+    protected abstract S inverseConvert(T value);
 
     public void dispose() {
         property1.removeListener(listener);
