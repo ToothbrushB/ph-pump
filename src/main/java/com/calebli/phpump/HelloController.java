@@ -459,6 +459,7 @@ public class HelloController {
     }
 
     private void sendString(String s) {
+        s += "\r";
         if (currentPort == null || !currentPort.isOpen()) {
             createPopup("Device is not connected. Cannot send command:\n" + s, "error-popup");
             return;
@@ -517,12 +518,9 @@ public class HelloController {
 
             @Override
             public void serialEvent(SerialPortEvent event) {
-                if (firstTime) {
-                    loadSlope();
-                    firstTime = false;
-                }
                 byte[] originalMessage = event.getReceivedData();
                 String omsg = new String(originalMessage);
+//                System.out.println(omsg);
                 connectedDog.feed();
                 if (originalMessage[0] == '.') { // from the pump/water sensor side
                     byte[] payload = Arrays.copyOfRange(originalMessage, 1, originalMessage.length);
@@ -550,9 +548,13 @@ public class HelloController {
                         }
                     }
                 } else { // from the pH probe
+                    if (firstTime) {
+                        loadSlope();
+                        firstTime = false;
+                    }
                     if (omsg.charAt(0) == '?') { // response from a command
                         Platform.runLater(() -> consoleText.appendText(omsg + "\n"));
-                        if (omsg.startsWith("?Slope,")) { // slope
+                        if (omsg.startsWith("?SLOPE,")) { // slope
                             Platform.runLater(() -> {
                                 String[] parsed = omsg.split(",");
                                 acidSlope.setText(parsed[1] + "%");
@@ -560,6 +562,7 @@ public class HelloController {
                                 zeroOffset.setText(parsed[3] + " mV");
                             });
                         }
+                    } else if (omsg.equals("*OK\r")) {
                     } else { // new ph data
                         double pH = Double.MIN_VALUE;
                         try {
