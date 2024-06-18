@@ -28,7 +28,10 @@ import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCombination;
+import javafx.scene.layout.Background;
+import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.paint.Color;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.FileChooser;
 import javafx.stage.Popup;
@@ -568,6 +571,8 @@ public class HelloController {
                         try {
                             pH = Double.parseDouble(omsg);
                             double finalPH = pH;
+                            digitalMeter.setBackground(new Background(new BackgroundFill(Color.color(Math.random(), Math.random(), Math.random()), null, null)));
+
                             Platform.runLater(() -> digitalMeter.setText(pHMeterFormat.format(finalPH)));
                         } catch (NumberFormatException e) {
                             System.out.println("Invalid response from probe: " + omsg);
