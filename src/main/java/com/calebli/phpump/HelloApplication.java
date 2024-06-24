@@ -47,6 +47,8 @@ public class HelloApplication extends Application {
         scene.getWindow().setOnCloseRequest(ev -> {
             if (!appCtrl.shutdown()) {
                 ev.consume();
+            } else {
+                System.exit(0);
             }
         });
     }

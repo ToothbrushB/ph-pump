@@ -77,6 +77,7 @@
             <padding>
                 <Insets topRightBottomLeft="10"/>
             </padding>
+            <Label fx:id="numData" text="0"/>
             <TableView fx:id="tableView"/>
             <HBox>
                 <DoubleTextField fx:id="enterTime" promptText="Time"/>

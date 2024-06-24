@@ -65,6 +65,8 @@ public class HelloController {
     private final OpenFileService openFileService = new OpenFileService();
     private final SimpleBooleanProperty unsavedChanges = new SimpleBooleanProperty(false);
     @FXML
+    private Label numData;
+    @FXML
     private ComboBox<TimeUnits> timeUnitComboBox;
     @FXML
     private Label statusReadout;
@@ -310,6 +312,7 @@ public class HelloController {
                         }
                     });
                 }
+                numData.setText(data.size() + " items");
             }
         });
         lineChart.getData().add(TimeUnits.SECOND.getSeries());
@@ -571,7 +574,7 @@ public class HelloController {
                         try {
                             pH = Double.parseDouble(omsg);
                             double finalPH = pH;
-                            digitalMeter.setBackground(new Background(new BackgroundFill(Color.color(Math.random(), Math.random(), Math.random()), null, null)));
+                            digitalMeter.setBackground(new Background(new BackgroundFill(Color.color(Math.random(), Math.random(), Math.random(), 0.3), null, null)));
 
                             Platform.runLater(() -> digitalMeter.setText(pHMeterFormat.format(finalPH)));
                         } catch (NumberFormatException e) {
@@ -832,7 +835,7 @@ public class HelloController {
                 } else if (bt.equals(btSaveAs)) {
                     saveAs();
                 } else if (bt.equals(btDiscard)) {
-
+                    doIt.set(true);
                 } else {
                     doIt.set(false);
                 }
